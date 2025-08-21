@@ -1,5 +1,5 @@
 """
-Module de régression linéaire avec descente de gradient.
+Linear Regression with gradient descent and OLS
 """
 
 import math
