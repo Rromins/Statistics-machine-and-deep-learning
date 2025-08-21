@@ -1,183 +1,219 @@
+"""
+Module de régression linéaire avec descente de gradient.
+"""
+
+import math
 import numpy as np
-import matplotlib.pyplot as plt
 
-class UnivariateLinearRegression():
+class LinearRegression():
     """
-    Ordinary Least Squares (OLS) regression for a single explanatory variable.
-
-    Parameters --- 
-        X : array-like of shape (n_samples,)
-            Input variable.
-        Y : array-like of shape (n_samples,)
-            Target variable.
-
-    Methods ---
-        fit(intercept=True)
-            Estimate regression coefficients.
-        plot(beta)
-            Display data points and fitted regression line.
-    """
-    def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
-
-    def _prepare_data(self, intercept):
-        """
-        Prepare the data matrix for regression.
-
-        If `intercept` is True, adds a column of ones to the design matrix.
-        Transforms X and Y into the correct 2D shapes for computations.
-
-        Parameters ---
-            intercept : bool
-                Whether to add an intercept term to the regression.
-
-        Raises ---
-            ValueError
-                If `intercept` is not boolean, or if `X` is not one-dimensional.
-        """
-        try:
-            if intercept == True:
-                self.df = np.vstack([np.ones(len(self.X)), self.X]).T
-            elif intercept == False:
-                self.df = np.array(self.X).reshape(-1, 1)
-            else:
-                raise ValueError("Variable 'intercept' must be equal to True or False.")
-        except:
-            raise ValueError("Variable X must be a one-dimensional array.")
-        self.Y = np.array(self.Y).reshape(-1, 1)
-    
-    def fit(self, intercept=True):
-        """
-        Estimate regression coefficients using the normal equations.
-
-        Solves the system:
-            Beta = (X^T X)^(-1) X^T Y
-
-        Parameters ---
-            intercept : bool, default=True
-                If True, add an intercept term to the regression.
-
-        Returns ---
-            beta : ndarray of shape (n_features,) or (n_features+1,)
-                Estimated regression coefficients.
-            residuals : ndarray of shape (n_samples,)
-                Differences between observed and predicted values.
-        """
-        self._prepare_data(intercept=intercept)
-        
-        # calculate matrices
-        xT = self.df.T
-        xTx_inv = np.linalg.inv(np.dot(xT, self.df))
-        xTy = np.dot(xT, self.Y)
-        beta = np.dot(xTx_inv, xTy)
-        Xbeta = np.dot(self.df, beta)
-        residuals = self.Y - Xbeta
-        return beta.reshape(-1), residuals.reshape(-1)
-
-    def plot(self, beta):
-        """
-        Plot the data points and the fitted regression line.
-
-        Parameters ---
-            beta : ndarray of shape (n_features,)
-                Estimated regression coefficients, typically obtained from `fit`.
-
-        Raises ---
-            ValueError
-                If the model has not been fitted before plotting.
-        """
-        try:
-            plt.scatter(self.X, self.Y, s=5)
-            plt.plot(self.X, np.dot(self.df, beta), label='Univariate Linear Regression line', c='red')
-            plt.legend()
-            plt.xlabel('X')
-            plt.ylabel('Y')
-            plt.title('Univariate Linear Regression')
-            plt.show()
-        except:
-            raise ValueError("Data need to be fit before plotting.")
-
-
-class MultivariateLinearRegression():
-    """
-    Ordinary Least Squares (OLS) regression for multiple explanatory variables.
+    Ordinary Least Squares (OLS) regression and Gradient Descent optimization
+    for multiple explanatory variables.
 
     This class fits a linear model of the form:
         Y = beta_0 + beta_1 X_1 + beta_2 X_2 + ... + beta_n X_n + epsilon
 
-    Parameters ---
-        X : array-like of shape (n_samples, n_features)
-            Input data matrix.
-        Y : array-like of shape (n_samples,)
-            Target variable.
+    Parameters
+    ----------
+    learning_rate : float
+        Step size for the gradient descent algorithm.
+    iterations : int
+        Number of iterations to run gradient descent.
 
-    Methods ---
-        fit(intercept=True)
-            Estimate regression coefficients using the normal equations.
+    Methods
+    -------
+    fit(x, y, intercept=True, method='Gradient Descent')
+        Estimate regression coefficients using either OLS or Gradient Descent.
     """
-    def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
+    def __init__(self, learning_rate, iterations):
+        self.learning_rate = learning_rate
+        self.iterations = iterations
 
-    def _prepare_data(self, intercept):
+    def _prepare_data(self, x, intercept):
         """
         Prepare the design matrix for regression.
 
-        If `intercept` is True, adds a column of ones to X.
-        Transforms Y into the correct 2D shape.
+        Adds an intercept column of ones to `x` if `intercept=True`.
 
-        Parameters ---
-            intercept : bool
-                Whether to add an intercept term to the regression.
+        Parameters
+        ----------
+        x : ndarray of shape (n_samples, n_features)
+            Input data matrix.
+        intercept : bool
+            Whether to add an intercept column.
 
-        Raises ---
-            ValueError
-                If `X` does not have the correct shape (n_samples, n_features).
+        Returns
+        -------
+        x : ndarray of shape (n_samples, n_features) or (n_samples, n_features+1)
+            Prepared design matrix.
+
+        Raises
+        ------
+        ValueError
+            If `intercept` is not boolean or if `x` is not at least 1D.
         """
         try:
-            if intercept == True:
-                self.df = np.hstack((self.X, np.ones(len(self.X))[:, None]))
-            elif intercept == False:
-                self.df = self.X
-            else:
+            if intercept:
+                x = np.insert(x, 0, 1, axis=1)
+            elif intercept not in (True, False):
                 raise ValueError("Variable 'intercept' must be equal to True or False")
-        except:
-            raise ValueError("Matrice X must be of the shape (n_samples, n_features)")
-        self.Y = np.array(self.Y).reshape(-1, 1)
-    
-    def fit(self, intercept=True):
+        except Exception as exc:
+            raise ValueError("X must be at least a one-dimensional array.") from exc
+
+        return x
+
+    def _cost_function(self, x, beta, y):
         """
-        Estimate regression coefficients using the normal equations.
+        Compute the Mean Squared Error (MSE) cost function.
 
-        Solves the system:
-            Beta = (X^T X)^(-1) X^T Y
+        Parameters
+        ----------
+        x : ndarray of shape (n_samples, n_features)
+            Design matrix.
+        beta : ndarray of shape (n_features, 1)
+            Regression coefficients.
+        y : ndarray of shape (n_samples, 1)
+            Target values.
 
-        Parameters ---
-            intercept : bool, default=True
-                If True, add an intercept term to the regression.
-
-        Returns ---
-            beta : ndarray of shape (n_features,) or (n_features+1,)
-                Estimated regression coefficients.
-            residuals : ndarray of shape (n_samples,)
-                Differences between observed and predicted values.
-
-        Raises ---
-            ValueError
-                If the input matrix X does not have the correct shape.
+        Returns
+        -------
+        float
+            Value of the cost function (MSE).
         """
-        self._prepare_data(intercept=intercept)
-        
+        n = x.shape[0]
+        return (1/n) * np.sum((y - np.dot(x, beta))**2)
+
+    def _compute_gradient(self, x, beta, y):
+        """
+        Compute the gradient of the cost function with respect to beta.
+
+        Parameters
+        ----------
+        x : ndarray of shape (n_samples, n_features)
+            Design matrix.
+        beta : ndarray of shape (n_features, 1)
+            Regression coefficients.
+        y : ndarray of shape (n_samples, 1)
+            Target values.
+
+        Returns
+        -------
+        ndarray of shape (n_features, 1)
+            Gradient vector.
+        """
+        n = x.shape[0]
+        return -(2/n) * np.dot(x.T, (y - np.dot(x, beta)))
+
+    def _ols(self, x, y):
+        """
+        Estimate regression coefficients using the Normal Equations.
+
+        Solves:
+            beta = (X^T*X)^(-1) * X^T*y
+
+        Parameters
+        ----------
+        x : ndarray of shape (n_samples, n_features)
+            Design matrix.
+        y : ndarray of shape (n_samples, 1)
+            Target values.
+
+        Returns
+        -------
+        beta : ndarray of shape (n_features, 1)
+            Estimated coefficients.
+        cost_function : float
+            Value of the cost function at the solution.
+        residuals : ndarray of shape (n_samples, 1)
+            Differences between observed and predicted values.
+        """
         # calculate matrices
-        try:
-            xT = self.df.T
-            xTx_inv = np.linalg.inv(np.dot(xT, self.df))
-            xTy = np.dot(xT, self.Y)
-            beta = np.dot(xTx_inv, xTy)
-            Xbeta = np.dot(self.df, beta)
-            residuals = self.Y - Xbeta
-        except:
-            raise ValueError("Matrice X must be of the shape (n_samples, n_features)")
-        
-        return beta.reshape(-1), residuals.reshape(-1)
+        xt = x.T
+        xtx_inv = np.linalg.inv(np.dot(xt, x))
+        xty = np.dot(xt, y)
+
+        # compute beta, residuals and the cost function value
+        beta = np.dot(xtx_inv, xty)
+        residuals = y - np.dot(x, beta)
+        cost_function = self._cost_function(x, beta, y)
+
+        return beta, cost_function, residuals
+
+    def _gradient_descent(self, x, y):
+        """
+        Estimate regression coefficients using Gradient Descent.
+
+        Parameters
+        ----------
+        x : ndarray of shape (n_samples, n_features)
+            Design matrix.
+        y : ndarray of shape (n_samples, 1)
+            Target values.
+
+        Returns
+        -------
+        beta : ndarray of shape (n_features, 1)
+            Estimated coefficients.
+        cost_function : list of float
+            History of the cost function values across iterations.
+        residuals : ndarray of shape (n_samples, 1)
+            Differences between observed and predicted values.
+        """
+        # choose the starting point randomly
+        limit = 1 / math.sqrt(x.shape[0])
+        beta = np.random.uniform(-limit, limit, (x.shape[1], 1))
+
+        # initiate the cost function history
+        cost_function = []
+
+        # run the gradient descent process
+        for _ in range(self.iterations):
+            gradient = self._compute_gradient(x, beta, y)
+            beta = beta - self.learning_rate * gradient
+            cost_function.append(self._cost_function(x, beta, y))
+        residuals = y - np.dot(x, beta)
+
+        return beta, cost_function, residuals
+
+    def fit(self, x, y, intercept=True, method='Gradient Descent'):
+        """
+        Fit a linear regression model to the data.
+
+        Parameters
+        ----------
+        x : array-like of shape (n_samples, n_features)
+            Input data matrix.
+        y : array-like of shape (n_samples,)
+            Target values.
+        intercept : bool, default=True
+            Whether to add an intercept term.
+        method : {'OLS', 'Gradient Descent'}, default='Gradient Descent'
+            Estimation method.
+
+        Returns
+        -------
+        beta : ndarray of shape (n_features,) or (n_features+1,)
+            Estimated regression coefficients.
+        cost_function : float or list of float
+            Cost function value(s). A float for OLS, a list for Gradient Descent.
+        residuals : ndarray of shape (n_samples,)
+            Differences between observed and predicted values.
+
+        Raises
+        ------
+        ValueError
+            If `method` is not 'OLS' or 'Gradient Descent'.
+        """
+        x = self._prepare_data(x=x, intercept=intercept)
+        y = np.array(y).reshape(-1, 1)
+
+        if method == 'OLS':
+            beta, cost_function, residuals = self._ols(x, y)
+
+        elif method == 'Gradient Descent':
+            beta, cost_function, residuals = self._gradient_descent(x, y)
+
+        else:
+            raise ValueError("'method' need to be equal to 'OLS' or 'Gradient Descent'")
+
+        return beta.reshape(-1), cost_function, residuals.reshape(-1)
