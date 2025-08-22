@@ -15,21 +15,26 @@ class LinearRegression():
 
     Parameters
     ----------
-    learning_rate : float
+    learning_rate : float, default=0.01
         Step size for the gradient descent algorithm.
-    iterations : int
+    iterations : int, default=1000
         Number of iterations to run gradient descent.
+    intercept : bool, default=True
+        Whether to add an intercept column.
 
     Methods
     -------
-    fit(x, y, intercept=True, method='Gradient Descent')
+    fit(x, y, method='Gradient Descent')
         Estimate regression coefficients using either OLS or Gradient Descent.
+    predit(x, beta)
+        Predict target values using the linear regression model.
     """
-    def __init__(self, learning_rate, iterations):
+    def __init__(self, intercept=True, learning_rate=0.01, iterations=1000):
         self.learning_rate = learning_rate
         self.iterations = iterations
+        self.intercept = intercept
 
-    def _prepare_data(self, x, intercept):
+    def _prepare_data(self, x):
         """
         Prepare the design matrix for regression.
 
@@ -39,8 +44,6 @@ class LinearRegression():
         ----------
         x : ndarray of shape (n_samples, n_features)
             Input data matrix.
-        intercept : bool
-            Whether to add an intercept column.
 
         Returns
         -------
@@ -53,9 +56,9 @@ class LinearRegression():
             If `intercept` is not boolean or if `x` is not at least 1D.
         """
         try:
-            if intercept:
+            if self.intercept:
                 x = np.insert(x, 0, 1, axis=1)
-            elif intercept not in (True, False):
+            elif self.intercept not in (True, False):
                 raise ValueError("Variable 'intercept' must be equal to True or False")
         except Exception as exc:
             raise ValueError("X must be at least a one-dimensional array.") from exc
@@ -175,7 +178,7 @@ class LinearRegression():
 
         return beta, cost_function, residuals
 
-    def fit(self, x, y, intercept=True, method='Gradient Descent'):
+    def fit(self, x, y, method='Gradient Descent'):
         """
         Fit a linear regression model to the data.
 
@@ -185,8 +188,6 @@ class LinearRegression():
             Input data matrix.
         y : array-like of shape (n_samples,)
             Target values.
-        intercept : bool, default=True
-            Whether to add an intercept term.
         method : {'OLS', 'Gradient Descent'}, default='Gradient Descent'
             Estimation method.
 
@@ -204,7 +205,7 @@ class LinearRegression():
         ValueError
             If `method` is not 'OLS' or 'Gradient Descent'.
         """
-        x = self._prepare_data(x=x, intercept=intercept)
+        x = self._prepare_data(x=x)
         y = np.array(y).reshape(-1, 1)
 
         if method == 'OLS':
@@ -217,3 +218,33 @@ class LinearRegression():
             raise ValueError("'method' need to be equal to 'OLS' or 'Gradient Descent'")
 
         return beta.reshape(-1), cost_function, residuals.reshape(-1)
+
+    def predict(self, x, beta):
+        """
+        Predict target values using the linear regression model.
+
+        Parameters
+        ----------
+        x : array-like of shape (n_samples, n_features)
+            Input data matrix for which predictions are to be made.
+        beta : ndarray of shape (n_features,) or (n_features+1,)
+            Regression coefficients previously estimated by `fit`.
+        
+        Returns
+        -------
+        y_hat : ndarray of shape (n_samples,)
+            Predicted values corresponding to the input data `x`.
+
+        Raises
+        ------
+        ValueError
+            If the design matrix `x` cannot be prepared (e.g., the model
+            has not been fitted yet, or input dimensions are inconsistent).
+        """
+        try:
+            x = self._prepare_data(x=x)
+            y_hat = np.dot(x, beta)
+        except Exception as exc:
+            raise ValueError("Need to fit values before predict.") from exc
+
+        return y_hat
