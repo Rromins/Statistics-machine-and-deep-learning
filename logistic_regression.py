@@ -148,6 +148,11 @@ class LogisticRegression():
         l = self.l0
         x = self._prepare_data(x)
 
+        if y.ndim != 2 or y.shape[1] != 1:
+            raise ValueError(
+                f"y must be of shape (n_samples, 1), got {y.shape} instead."
+            )
+
         beta = np.zeros((x.shape[1], 1))
         beta_next = beta - (1/l) * self._logistic_gradient(x, y, beta)
         for _ in range(self.max_iterations):
