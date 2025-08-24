@@ -241,10 +241,6 @@ class LinearRegression():
             If the design matrix `x` cannot be prepared (e.g., the model
             has not been fitted yet, or input dimensions are inconsistent).
         """
-        try:
-            x = self._prepare_data(x=x)
-            y_hat = np.dot(x, beta)
-        except Exception as exc:
-            raise ValueError("Need to fit values before predict.") from exc
-
+        x = self._prepare_data(x=x)
+        y_hat = np.dot(x, beta)
         return y_hat
