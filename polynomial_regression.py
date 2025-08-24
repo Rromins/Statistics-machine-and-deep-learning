@@ -36,13 +36,14 @@ class PolynomialRegression():
     - Input features are expanded to polynomial terms using combinations with replacement.
     - Intercept (bias term) can be added explicitly in the transformed design matrix.
     """
-    def __init__(self, degree=2, learning_rate=0.01, iterations=1000, lam=1e-3):
+    def __init__(self, intercept=True, degree=2, learning_rate=0.01, iterations=1000, lam=1e-3):
+        self.intercept = intercept
         self.degree = degree
         self.learning_rate = learning_rate
         self.iterations = iterations
         self.lam = lam
 
-    def polynomial_transform(self, x, intercept=True):
+    def polynomial_transform(self, x):
         """
         Expand the input data with polynomial features up to the specified degree.
 
@@ -76,9 +77,9 @@ class PolynomialRegression():
         for i, index in enumerate(all_combinations):
             x_poly[:, i] = np.prod(x[:, index], axis=1)
 
-        if intercept:
+        if self.intercept:
             x_poly = np.insert(x_poly, 0, 1, axis=1)
-        elif intercept not in (True, False):
+        elif self.intercept not in (True, False):
             raise ValueError("Variable 'intercept' must be equal to True or False")
 
         return x_poly
@@ -198,7 +199,7 @@ class PolynomialRegression():
 
         return beta, cost_function, residuals
 
-    def fit(self, x, y, intercept=True, method='OLS'):
+    def fit(self, x, y, method='OLS'):
         """
         Fit the polynomial regression model to data.
 
@@ -227,7 +228,7 @@ class PolynomialRegression():
         ValueError
             If `method` is not recognized.
         """
-        x_poly = self.polynomial_transform(x=x, intercept=intercept)
+        x_poly = self.polynomial_transform(x=x)
         y = np.array(y).reshape(-1, 1)
 
         if method == 'OLS':
@@ -241,7 +242,7 @@ class PolynomialRegression():
 
         return beta.reshape(-1), cost_function, residuals.reshape(-1)
 
-    def predict(self, x, beta, intercept=True):
+    def predict(self, x, beta):
         """
         Predict target values for new input data.
 
@@ -259,7 +260,7 @@ class PolynomialRegression():
         y_hat : ndarray of shape (n_samples,)
             Predicted target values.
         """
-        x = self.polynomial_transform(x=x, intercept=intercept)
+        x = self.polynomial_transform(x=x)
         y_hat = np.dot(x, beta)
 
         return y_hat
